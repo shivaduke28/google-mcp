@@ -40,7 +40,7 @@ async function getGmail() {
 
 const server = new McpServer({
   name: "gmail-mcp",
-  version: "0.5.0",
+  version: "1.0.0",
 });
 
 // 1. search-messages

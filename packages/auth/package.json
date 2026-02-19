@@ -1,11 +1,22 @@
 {
   "name": "@shivaduke28/google-mcp-auth",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shivaduke28/google-mcp.git",
+    "directory": "packages/auth"
+  },
+  "author": "shivaduke",
+  "license": "ISC",
+  "description": "Shared OAuth authentication for google-mcp (PKCE support)",
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit"

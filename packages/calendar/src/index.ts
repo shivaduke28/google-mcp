@@ -53,7 +53,7 @@ async function getCal() {
 
 const server = new McpServer({
   name: "google-calendar-mcp",
-  version: "0.5.0",
+  version: "1.0.0",
 });
 
 server.registerTool(

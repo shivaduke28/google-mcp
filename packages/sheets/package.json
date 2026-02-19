@@ -1,6 +1,6 @@
 {
   "name": "@shivaduke28/google-sheets-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -9,6 +9,14 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shivaduke28/google-mcp.git",
+    "directory": "packages/sheets"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
