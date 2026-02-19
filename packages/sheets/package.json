@@ -1,0 +1,38 @@
+{
+  "name": "@shivaduke28/google-sheets-mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "google-sheets-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "google-sheets",
+    "model-context-protocol"
+  ],
+  "author": "shivaduke",
+  "license": "ISC",
+  "description": "Google Sheets MCP server with allowlist-based permission control",
+  "dependencies": {
+    "@googleapis/sheets": "^13.0.1",
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@shivaduke28/google-mcp-auth": "workspace:*",
+    "@toon-format/toon": "^2.1.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
