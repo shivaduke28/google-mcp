@@ -6,9 +6,26 @@ import { encode } from "@toon-format/toon";
 import { authorize } from "@shivaduke28/google-mcp-auth";
 import { calendar as googleCalendar } from "@googleapis/calendar";
 import { loadPermissionConfig, checkPermission, denyMessage, PermissionAction, OperationType } from "./permissions.js";
+import { findMeetingUrl } from "./meeting-url.js";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
@@ -53,7 +70,7 @@ async function getCal() {
 
 const server = new McpServer({
   name: "google-calendar-mcp",
-  version: "1.0.0",
+  version: "1.1.0",
 });
 
 server.registerTool(
@@ -81,12 +98,18 @@ server.registerTool(
       calendarIds: z.array(z.string()).describe("カレンダーID（メールアドレス）の配列。自分のカレンダーは \"primary\""),
       timeMin: z.string().describe("開始日時（ISO 8601）"),
       timeMax: z.string().describe("終了日時（ISO 8601）"),
-      maxResults: z.number().optional().default(20).describe("カレンダーごとの最大取得件数"),
+      maxResults: z.number().optional().default(50).describe("カレンダーごとの最大取得件数"),
     },
   },
   async ({ calendarIds, timeMin, timeMax, maxResults }) => {
     const cal = await getCal();
-    const rows: { date: string; calendar: string; id: string; summary: string; start: string; end: string; attendees: string }[] = [];
+    const rows: {
+      date: string; calendar: string; id: string; summary: string;
+      start: string; end: string; location: string; description: string;
+      conferenceUrl: string;
+      attendees: { email: string; displayName: string; status: string; organizer: boolean; resource: boolean }[];
+      isRecurring: boolean; status: string; transparency: string;
+    }[] = [];
 
     for (const calendarId of calendarIds) {
       try {
@@ -97,12 +120,19 @@ server.registerTool(
           maxResults,
           singleEvents: true,
           orderBy: "startTime",
+          ...({ conferenceDataVersion: 1 }),
         });
 
         for (const e of res.data.items ?? []) {
           const startDt = e.start?.dateTime ? new Date(e.start.dateTime) : null;
           const endDt = e.end?.dateTime ? new Date(e.end.dateTime) : null;
           const isAllDay = !e.start?.dateTime;
+
+          const conferenceUri =
+            e.conferenceData?.entryPoints?.find((ep) => ep.entryPointType === "video")?.uri
+            ?? findMeetingUrl(e.description)
+            ?? findMeetingUrl(e.location)
+            ?? "";
 
           rows.push({
             date: isAllDay
@@ -113,7 +143,19 @@ server.registerTool(
             summary: e.summary ?? "(無題)",
             start: isAllDay ? "終日" : (startDt?.toLocaleTimeString("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }) ?? ""),
             end: isAllDay ? "" : (endDt?.toLocaleTimeString("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }) ?? ""),
-            attendees: (e.attendees ?? []).map((a) => a.email).filter(Boolean).join(";"),
+            location: e.location ?? "",
+            description: e.description ? stripHtml(e.description) : "",
+            conferenceUrl: conferenceUri,
+            attendees: (e.attendees ?? []).map((a) => ({
+              email: a.email ?? "",
+              displayName: a.displayName ?? "",
+              status: a.responseStatus ?? "",
+              organizer: a.organizer ?? false,
+              resource: a.resource ?? false,
+            })),
+            isRecurring: !!e.recurringEventId,
+            status: e.status ?? "",
+            transparency: e.transparency ?? "opaque",
           });
         }
       } catch {
@@ -124,7 +166,13 @@ server.registerTool(
           summary: "(アクセス権限がありません)",
           start: "",
           end: "",
-          attendees: "",
+          location: "",
+          description: "",
+          conferenceUrl: "",
+          attendees: [],
+          isRecurring: false,
+          status: "",
+          transparency: "opaque",
         });
       }
     }
@@ -274,6 +322,61 @@ server.registerTool(
       content: [{
         type: "text",
         text: `イベント「${existing.data.summary ?? "(無題)"}」を削除しました。`,
+      }],
+    };
+  }
+);
+
+server.registerTool(
+  "freebusy",
+  {
+    description: "複数人のカレンダーの空き/忙し情報を取得する。予定の詳細は返さず、busy（予定あり）の時間帯のみ返す。日程調整に最適。レスポンスはTOON形式で返す。",
+    inputSchema: {
+      calendarIds: z.array(z.string()).describe("カレンダーID（メールアドレス）の配列。自分のカレンダーは \"primary\""),
+      timeMin: z.string().describe("開始日時（ISO 8601）"),
+      timeMax: z.string().describe("終了日時（ISO 8601）"),
+    },
+  },
+  async ({ calendarIds, timeMin, timeMax }) => {
+    const cal = await getCal();
+    const res = await cal.freebusy.query({
+      requestBody: {
+        timeMin,
+        timeMax,
+        timeZone: "Asia/Tokyo",
+        items: calendarIds.map((id) => ({ id })),
+      },
+    });
+
+    const rows: { calendar: string; start: string; end: string; error: string }[] = [];
+
+    for (const calendarId of calendarIds) {
+      const data = res.data.calendars?.[calendarId];
+      if (data?.errors?.length) {
+        rows.push({
+          calendar: calendarId,
+          start: "",
+          end: "",
+          error: data.errors.map((e) => e.reason ?? "unknown").join(", "),
+        });
+      } else {
+        for (const busy of data?.busy ?? []) {
+          rows.push({
+            calendar: calendarId,
+            start: busy.start ?? "",
+            end: busy.end ?? "",
+            error: "",
+          });
+        }
+      }
+    }
+
+    return {
+      content: [{
+        type: "text",
+        text: rows.length > 0
+          ? encode({ busy: rows })
+          : "指定期間にbusy区間はありません",
       }],
     };
   }
