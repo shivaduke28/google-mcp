@@ -45,7 +45,7 @@ async function getSheets() {
 
 const server = new McpServer({
   name: "google-sheets-mcp",
-  version: "1.0.0",
+  version: "1.0.1",
 });
 
 // 1. list-spreadsheets
@@ -146,20 +146,10 @@ server.registerTool(
       };
     }
 
-    // ヘッダー行 + データ行をオブジェクト配列に変換
-    const headers = values[0] as string[];
-    const rows = values.slice(1).map((row) => {
-      const obj: Record<string, string> = {};
-      for (let i = 0; i < headers.length; i++) {
-        obj[headers[i]] = (row[i] as string | undefined) ?? "";
-      }
-      return obj;
-    });
-
     return {
       content: [{
         type: "text",
-        text: encode({ range: res.data.range ?? range, rows }),
+        text: encode({ range: res.data.range ?? range, values }),
       }],
     };
   }
