@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { encode } from "@toon-format/toon";
-import { authorize } from "@shivaduke28/google-mcp-auth";
+import { authorize, resolvePath } from "@shivaduke28/google-mcp-auth";
 import { calendar as googleCalendar } from "@googleapis/calendar";
 import { loadPermissionConfig, checkPermission, denyMessage, PermissionAction, OperationType } from "./permissions.js";
 import { findMeetingUrl } from "./meeting-url.js";
@@ -32,20 +32,21 @@ const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
 ];
 
-const credentialsPath = process.env.GOOGLE_OAUTH_CREDENTIALS;
-const configPath = process.env.GOOGLE_MCP_CONFIG;
+const rawCredentialsPath = process.env.GOOGLE_OAUTH_CREDENTIALS;
+const configPath = process.env.GOOGLE_MCP_CONFIG ? resolvePath(process.env.GOOGLE_MCP_CONFIG) : undefined;
 
-if (!credentialsPath) {
+if (!rawCredentialsPath) {
   console.error("GOOGLE_OAUTH_CREDENTIALS 環境変数を設定してください");
   process.exit(1);
 }
+const credentialsPath = resolvePath(rawCredentialsPath);
 if (!existsSync(credentialsPath)) {
   console.error(`credentials.json が見つかりません: ${credentialsPath}`);
   process.exit(1);
 }
 
 const resolvedCredentialsPath: string = credentialsPath;
-const resolvedTokensPath: string = process.env.GOOGLE_OAUTH_TOKENS ?? join(homedir(), ".config", "google-calendar-mcp", "tokens.json");
+const resolvedTokensPath: string = process.env.GOOGLE_OAUTH_TOKENS ? resolvePath(process.env.GOOGLE_OAUTH_TOKENS) : join(homedir(), ".config", "google-calendar-mcp", "tokens.json");
 
 // パーミッション設定
 const permConfig = await loadPermissionConfig(configPath);
@@ -70,7 +71,7 @@ async function getCal() {
 
 const server = new McpServer({
   name: "google-calendar-mcp",
-  version: "1.1.0",
+  version: "1.2.0",
 });
 
 server.registerTool(

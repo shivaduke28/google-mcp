@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { encode } from "@toon-format/toon";
-import { authorize } from "@shivaduke28/google-mcp-auth";
+import { authorize, resolvePath } from "@shivaduke28/google-mcp-auth";
 import { gmail as googleGmail } from "@googleapis/gmail";
 import { extractHeaders, extractBody, buildRawMessage } from "./gmail.js";
 import { existsSync } from "node:fs";
@@ -14,18 +14,19 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.modify",
 ];
 
-const credentialsPath = process.env.GOOGLE_OAUTH_CREDENTIALS;
-if (!credentialsPath) {
+const rawCredentialsPath = process.env.GOOGLE_OAUTH_CREDENTIALS;
+if (!rawCredentialsPath) {
   console.error("GOOGLE_OAUTH_CREDENTIALS 環境変数を設定してください");
   process.exit(1);
 }
+const credentialsPath = resolvePath(rawCredentialsPath);
 if (!existsSync(credentialsPath)) {
   console.error(`credentials.json が見つかりません: ${credentialsPath}`);
   process.exit(1);
 }
 
 const resolvedCredentialsPath: string = credentialsPath;
-const resolvedTokensPath: string = process.env.GOOGLE_OAUTH_TOKENS ?? join(homedir(), ".config", "gmail-mcp", "tokens.json");
+const resolvedTokensPath: string = process.env.GOOGLE_OAUTH_TOKENS ? resolvePath(process.env.GOOGLE_OAUTH_TOKENS) : join(homedir(), ".config", "gmail-mcp", "tokens.json");
 
 // lazy auth: ツール呼び出し時に初めて認証する
 let gmailClient: ReturnType<typeof googleGmail> | null = null;
@@ -40,7 +41,7 @@ async function getGmail() {
 
 const server = new McpServer({
   name: "gmail-mcp",
-  version: "1.0.0",
+  version: "1.1.0",
 });
 
 // 1. search-messages

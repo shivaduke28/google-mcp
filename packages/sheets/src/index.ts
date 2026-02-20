@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { encode } from "@toon-format/toon";
-import { authorize } from "@shivaduke28/google-mcp-auth";
+import { authorize, resolvePath } from "@shivaduke28/google-mcp-auth";
 import { sheets as googleSheets } from "@googleapis/sheets";
 import { loadPermissionConfig, checkAccess } from "./permissions.js";
 import { existsSync } from "node:fs";
@@ -14,20 +14,21 @@ const SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
 ];
 
-const credentialsPath = process.env.GOOGLE_OAUTH_CREDENTIALS;
-const configPath = process.env.GOOGLE_MCP_CONFIG;
+const rawCredentialsPath = process.env.GOOGLE_OAUTH_CREDENTIALS;
+const configPath = process.env.GOOGLE_MCP_CONFIG ? resolvePath(process.env.GOOGLE_MCP_CONFIG) : undefined;
 
-if (!credentialsPath) {
+if (!rawCredentialsPath) {
   console.error("GOOGLE_OAUTH_CREDENTIALS 環境変数を設定してください");
   process.exit(1);
 }
+const credentialsPath = resolvePath(rawCredentialsPath);
 if (!existsSync(credentialsPath)) {
   console.error(`credentials.json が見つかりません: ${credentialsPath}`);
   process.exit(1);
 }
 
 const resolvedCredentialsPath: string = credentialsPath;
-const resolvedTokensPath: string = process.env.GOOGLE_OAUTH_TOKENS ?? join(homedir(), ".config", "google-sheets-mcp", "tokens.json");
+const resolvedTokensPath: string = process.env.GOOGLE_OAUTH_TOKENS ? resolvePath(process.env.GOOGLE_OAUTH_TOKENS) : join(homedir(), ".config", "google-sheets-mcp", "tokens.json");
 
 // パーミッション設定
 const permConfig = await loadPermissionConfig(configPath);
@@ -45,7 +46,7 @@ async function getSheets() {
 
 const server = new McpServer({
   name: "google-sheets-mcp",
-  version: "1.0.1",
+  version: "1.1.0",
 });
 
 // 1. list-spreadsheets

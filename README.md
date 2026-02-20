@@ -21,38 +21,31 @@ Google API の MCP (Model Context Protocol) サーバー群をまとめた pnpm 
 4. OAuth 2.0 クライアント ID を作成（デスクトップアプリ）
 5. 認証情報の JSON ファイルをダウンロード → `credentials.json` として保存
 
-### 2. ビルド
+### 2. MCP 設定
 
-```bash
-pnpm install
-pnpm build
-```
-
-### 3. MCP 設定
-
-各パッケージの `dist/index.js` を MCP サーバーとして登録します。
+`npx` で npm から直接実行できます。
 
 ```json
 {
   "mcpServers": {
     "google-calendar": {
-      "command": "node",
-      "args": ["/path/to/google-mcp/packages/calendar/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@shivaduke28/google-calendar-mcp"],
       "env": {
         "GOOGLE_OAUTH_CREDENTIALS": "/path/to/credentials.json",
         "GOOGLE_MCP_CONFIG": "/path/to/config.json"
       }
     },
     "gmail": {
-      "command": "node",
-      "args": ["/path/to/google-mcp/packages/gmail/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@shivaduke28/gmail-mcp"],
       "env": {
         "GOOGLE_OAUTH_CREDENTIALS": "/path/to/credentials.json"
       }
     },
     "google-sheets": {
-      "command": "node",
-      "args": ["/path/to/google-mcp/packages/sheets/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@shivaduke28/google-sheets-mcp"],
       "env": {
         "GOOGLE_OAUTH_CREDENTIALS": "/path/to/credentials.json",
         "GOOGLE_MCP_CONFIG": "/path/to/config.json"
@@ -62,14 +55,17 @@ pnpm build
 }
 ```
 
-### 4. 環境変数
+### 3. 環境変数
 
 | 変数 | 必須 | 説明 |
 |---|---|---|
 | `GOOGLE_OAUTH_CREDENTIALS` | Yes | OAuth クライアント認証情報の JSON ファイルパス |
 | `GOOGLE_MCP_CONFIG` | No | 共通設定ファイルパス（calendar / sheets で使用） |
+| `GOOGLE_OAUTH_TOKENS` | No | トークン保存先（デフォルト: `~/.config/<package>-mcp/tokens.json`） |
 
-### 5. 認証
+パスには `~` が使えます（`$HOME` に展開されます）。
+
+### 4. 認証
 
 初回起動時にブラウザが開き、Google アカウントでの認証を求められます。認証後、トークンは `~/.config/<package>-mcp/tokens.json` に自動保存されます。PKCE (Proof Key for Code Exchange) に対応。
 
@@ -100,11 +96,32 @@ pnpm build
 
 ## Development
 
+### ビルド・テスト
+
 ```bash
 pnpm install          # 依存解決
 pnpm build            # 全パッケージビルド
 pnpm typecheck        # 全パッケージ型チェック
 pnpm -r test          # 全パッケージテスト
+```
+
+### ローカルビルドで MCP サーバーを起動
+
+ビルド済みの `dist/index.js` を直接指定して起動することもできます。
+
+```json
+{
+  "mcpServers": {
+    "google-calendar": {
+      "command": "node",
+      "args": ["/path/to/google-mcp/packages/calendar/dist/index.js"],
+      "env": {
+        "GOOGLE_OAUTH_CREDENTIALS": "/path/to/credentials.json",
+        "GOOGLE_MCP_CONFIG": "/path/to/config.json"
+      }
+    }
+  }
+}
 ```
 
 ## License
