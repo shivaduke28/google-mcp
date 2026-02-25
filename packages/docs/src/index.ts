@@ -139,6 +139,8 @@ server.registerTool(
       pageSize: 50,
       orderBy: "modifiedTime desc",
       pageToken: pageToken ?? undefined,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
     });
 
     const files = (res.data.files ?? []).map((file) => ({
@@ -198,6 +200,7 @@ server.registerTool(
       const fileMeta = await drive.files.get({
         fileId,
         fields: "id, name, mimeType, parents",
+        supportsAllDrives: true,
       });
 
       if (fileMeta.data.mimeType !== GOOGLE_DOCS_MIME_TYPE) {
@@ -227,6 +230,7 @@ server.registerTool(
     const meta = await drive.files.get({
       fileId,
       fields: "id, name, modifiedTime, lastModifyingUser/displayName",
+      supportsAllDrives: true,
     });
 
     // Google Docs をエクスポート
@@ -301,6 +305,8 @@ server.registerTool(
           "files(id, name, modifiedTime, lastModifyingUser/displayName)",
         pageSize: 20,
         orderBy: "modifiedTime desc",
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
       });
 
       for (const file of res.data.files ?? []) {
