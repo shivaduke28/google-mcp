@@ -10,13 +10,14 @@ Google API の MCP (Model Context Protocol) サーバー群をまとめた pnpm 
 | [`packages/calendar`](packages/calendar/) | Google Calendar MCP サーバー |
 | [`packages/gmail`](packages/gmail/) | Gmail MCP サーバー |
 | [`packages/sheets`](packages/sheets/) | Google Sheets MCP サーバー |
+| [`packages/docs`](packages/docs/) | Google Docs MCP サーバー |
 
 ## Setup
 
 ### 1. GCP プロジェクトの準備
 
 1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成
-2. 使いたい API を有効化（Calendar / Gmail / Sheets）
+2. 使いたい API を有効化（Calendar / Gmail / Sheets / Drive）
 3. OAuth 同意画面を設定
 4. OAuth 2.0 クライアント ID を作成（デスクトップアプリ）
 5. 認証情報の JSON ファイルをダウンロード → `credentials.json` として保存
@@ -50,6 +51,14 @@ Google API の MCP (Model Context Protocol) サーバー群をまとめた pnpm 
         "GOOGLE_OAUTH_CREDENTIALS": "/path/to/credentials.json",
         "GOOGLE_MCP_CONFIG": "/path/to/config.json"
       }
+    },
+    "google-docs": {
+      "command": "npx",
+      "args": ["-y", "@shivaduke28/google-docs-mcp"],
+      "env": {
+        "GOOGLE_OAUTH_CREDENTIALS": "/path/to/credentials.json",
+        "GOOGLE_MCP_CONFIG": "/path/to/config.json"
+      }
     }
   }
 }
@@ -60,7 +69,7 @@ Google API の MCP (Model Context Protocol) サーバー群をまとめた pnpm 
 | 変数 | 必須 | 説明 |
 |---|---|---|
 | `GOOGLE_OAUTH_CREDENTIALS` | Yes | OAuth クライアント認証情報の JSON ファイルパス |
-| `GOOGLE_MCP_CONFIG` | No | 共通設定ファイルパス（calendar / sheets で使用） |
+| `GOOGLE_MCP_CONFIG` | No | 共通設定ファイルパス（calendar / sheets / docs で使用） |
 | `GOOGLE_OAUTH_TOKENS` | No | トークン保存先（デフォルト: `~/.config/<package>-mcp/tokens.json`） |
 
 パスには `~` が使えます（`$HOME` に展開されます）。
@@ -88,11 +97,19 @@ Google API の MCP (Model Context Protocol) サーバー群をまとめた pnpm 
     "allowedSpreadsheets": [
       { "id": "spreadsheet-id", "name": "表示名", "access": "readonly" }
     ]
+  },
+  "docs": {
+    "allowedDocuments": [
+      { "id": "document-id", "name": "表示名" }
+    ],
+    "allowedFolders": [
+      { "id": "folder-id", "name": "表示名" }
+    ]
   }
 }
 ```
 
-各パッケージは自分のキー（`calendar`, `sheets`）のみを読み込み、他のキーは無視します。詳細は各パッケージの README を参照してください。
+各パッケージは自分のキー（`calendar`, `sheets`, `docs`）のみを読み込み、他のキーは無視します。詳細は各パッケージの README を参照してください。
 
 ## Development
 
