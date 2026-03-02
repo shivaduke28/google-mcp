@@ -10,6 +10,8 @@ import {
   checkDocumentAccess,
   checkFolderAccess,
   isFileInAllowedFolder,
+  getAllSubfolderIds,
+  isDescendantOfAllowedFolder,
 } from "./permissions.js";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
@@ -128,14 +130,23 @@ server.registerTool(
   async ({ folderId, pageToken }) => {
     const { allowed, reason } = checkFolderAccess(permConfig, folderId);
     if (!allowed) {
-      return { content: [{ type: "text" as const, text: reason! }], isError: true };
+      // 直接の allowedFolder でなくても、祖先チェーンで許可フォルダの子孫なら許可
+      const drive = await getDrive();
+      const isDescendant = await isDescendantOfAllowedFolder(
+        drive,
+        permConfig,
+        [folderId]
+      );
+      if (!isDescendant) {
+        return { content: [{ type: "text" as const, text: reason! }], isError: true };
+      }
     }
 
     const drive = await getDrive();
     const res = await drive.files.list({
-      q: `'${folderId}' in parents and mimeType = '${GOOGLE_DOCS_MIME_TYPE}' and trashed = false`,
+      q: `'${folderId}' in parents and (mimeType = '${GOOGLE_DOCS_MIME_TYPE}' or mimeType = '${GOOGLE_FOLDER_MIME_TYPE}') and trashed = false`,
       fields:
-        "nextPageToken, files(id, name, modifiedTime, lastModifyingUser/displayName)",
+        "nextPageToken, files(id, name, mimeType, modifiedTime, lastModifyingUser/displayName)",
       pageSize: 50,
       orderBy: "modifiedTime desc",
       pageToken: pageToken ?? undefined,
@@ -146,6 +157,7 @@ server.registerTool(
     const files = (res.data.files ?? []).map((file) => ({
       id: file.id ?? "",
       name: file.name ?? "",
+      type: file.mimeType === GOOGLE_FOLDER_MIME_TYPE ? "folder" : "document",
       modifiedTime: file.modifiedTime ?? "",
       lastModifiedBy: file.lastModifyingUser?.displayName ?? "",
     }));
@@ -216,7 +228,12 @@ server.registerTool(
       }
 
       const parentIds = fileMeta.data.parents ?? [];
-      if (!isFileInAllowedFolder(permConfig, parentIds)) {
+      const inAllowedFolder = await isDescendantOfAllowedFolder(
+        drive,
+        permConfig,
+        parentIds
+      );
+      if (!inAllowedFolder) {
         return {
           content: [{ type: "text" as const, text: directAccess.reason! }],
           isError: true,
@@ -295,28 +312,37 @@ server.registerTool(
       lastModifiedBy: string;
       folder: string;
     }> = [];
+    const seenIds = new Set<string>();
 
-    // 許可されたフォルダ内を検索
+    // 許可されたフォルダ内を検索（サブフォルダ含む）
     for (const folder of permConfig.allowedFolders ?? []) {
-      const escapedQuery = query.replace(/'/g, "\\'");
-      const res = await drive.files.list({
-        q: `'${folder.id}' in parents and mimeType = '${GOOGLE_DOCS_MIME_TYPE}' and name contains '${escapedQuery}' and trashed = false`,
-        fields:
-          "files(id, name, modifiedTime, lastModifyingUser/displayName)",
-        pageSize: 20,
-        orderBy: "modifiedTime desc",
-        supportsAllDrives: true,
-        includeItemsFromAllDrives: true,
-      });
+      const subfolderIds = await getAllSubfolderIds(drive, folder.id);
+      const folderIdsToSearch = [folder.id, ...subfolderIds];
 
-      for (const file of res.data.files ?? []) {
-        allFiles.push({
-          id: file.id ?? "",
-          name: file.name ?? "",
-          modifiedTime: file.modifiedTime ?? "",
-          lastModifiedBy: file.lastModifyingUser?.displayName ?? "",
-          folder: folder.name,
+      for (const searchFolderId of folderIdsToSearch) {
+        const escapedQuery = query.replace(/'/g, "\\'");
+        const res = await drive.files.list({
+          q: `'${searchFolderId}' in parents and mimeType = '${GOOGLE_DOCS_MIME_TYPE}' and name contains '${escapedQuery}' and trashed = false`,
+          fields:
+            "files(id, name, modifiedTime, lastModifyingUser/displayName)",
+          pageSize: 20,
+          orderBy: "modifiedTime desc",
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true,
         });
+
+        for (const file of res.data.files ?? []) {
+          const fileId = file.id ?? "";
+          if (seenIds.has(fileId)) continue;
+          seenIds.add(fileId);
+          allFiles.push({
+            id: fileId,
+            name: file.name ?? "",
+            modifiedTime: file.modifiedTime ?? "",
+            lastModifiedBy: file.lastModifyingUser?.displayName ?? "",
+            folder: folder.name,
+          });
+        }
       }
     }
 
